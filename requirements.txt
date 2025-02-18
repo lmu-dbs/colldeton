@@ -1,0 +1,16 @@
+editdistance==0.6.1
+idendrogram_streamlit_component==0.2.5
+matplotlib==3.10.0
+networkx==3.1
+networkx==3.3
+numpy==1.20.3
+numpy==1.15.1
+pandas==1.4.4
+pm4py==2.7.0
+scikit_learn==1.2.2
+scipy==1.15.2
+seaborn==0.13.2
+squarify==0.4.3
+streamlit==1.28.2
+textdistance==4.2.1
+~treamlit==1.12.2

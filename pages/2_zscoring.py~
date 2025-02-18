@@ -1,0 +1,105 @@
+import numpy as np
+import streamlit as st
+from collections import defaultdict
+import matplotlib.pyplot as plt
+import squarify
+
+def find_connected_components(pairs):
+    graph = defaultdict(list)
+    # Build graph
+    for a, b in pairs:
+        graph[a].append(b)
+        graph[b].append(a)
+
+    visited = set()
+    groups = []
+
+    # Depth-First Search function to explore a group
+    def dfs(node, group):
+        visited.add(node)
+        group.append(node)
+        for neighbor in graph[node]:
+            if neighbor not in visited:
+                dfs(neighbor, group)
+
+    # Visit all nodes
+    for node in graph:
+        if node not in visited:
+            group = []
+            dfs(node, group)
+            groups.append(group)
+    return groups
+
+
+
+def visualize_groups_as_treemap(groups):
+    group_sizes = [len(group) for group in groups]
+    labels = [f"Group {i + 1}\n{group}\nSize: {len(group)}" for i, group in enumerate(groups)]
+    colors = plt.cm.Spectral([i / float(len(groups)) for i in range(len(groups))])
+
+    plt.figure(figsize=(8, 6))
+    squarify.plot(sizes=group_sizes, label=labels, color=colors, alpha=0.7)
+    plt.title("Treemap of Groups by Size")
+    plt.axis('off')
+    st.pyplot(plt)
+
+
+file_upload_abs = st.file_uploader("Upload a text file with absolute time and levenshtein distances", type="txt")
+if file_upload_abs is not None:
+    file_contents = file_upload_abs.read().decode("utf-8").splitlines()
+    time_zscores = []
+    levenshtein_zscores = []
+    abs_time_dists = []
+    abs_lev_dists = []
+    student_rels = []
+    metrics = dict()
+    filtered = dict()
+    for line in file_contents:
+        ids, dists = line.split(":")
+        f, t = map(int, ids.split("->"))
+        abs_time_dist, abs_lev_dist, time_lev_corr, time_zscore, levenshtein_zscore = map(float, dists.split(","))
+        metrics["->".join([str(f), str(t)])] = (abs_time_dist, abs_lev_dist, time_lev_corr, time_zscore, levenshtein_zscore)
+        student_rels.append((f, t))
+        time_zscores.append(time_zscore)
+        levenshtein_zscores.append(levenshtein_zscore)
+        abs_time_dists.append(abs_time_dist)
+        abs_lev_dists.append(abs_lev_dist)
+
+    # Remove duplicates from metrics
+    st.write("Removing duplicates")
+    metrics_without_duplicates = {k: v for k, v in metrics.items() if "->".join(sorted(k.split("->"))) == k}
+    st.write(f"Number of relations after removing duplicates: {len(metrics_without_duplicates)}")
+    metrics = metrics_without_duplicates
+    # st.write("Sorting metrics")
+    # sorted_metrics = sorted(metrics.items(), key=lambda x: (x[1][2], x[1][3], x[1][4]), reverse=True)
+    # filtered = dict(sorted_metrics[:29])
+
+    # filtered = {k: v for k, v in metrics.items() if v[3] < -1.4 and v[4] < -1.4 and v[2] > 0.38}
+    filtered = {k: v for k, v in metrics.items() if v[3] < -1.5 and v[4] < -2.2}
+
+    st.write(f"Number of filtered relations: {len(filtered)}")
+    # st.write(f"Filtered relations: {filtered}")
+    colluding_students = set()
+    for k in filtered.keys():
+        colluding_students.add(int(k.split("->")[0]))
+        colluding_students.add(int(k.split("->")[1]))
+    st.write(f"Number of colluding students: {len(colluding_students)}")
+
+    filtered_student_rels = [(int(k.split("->")[0]), int(k.split("->")[1])) for k in filtered.keys()]
+    groups = find_connected_components(filtered_student_rels)
+    st.write(f"Number of connected components: {len(groups)}")
+    st.write(f"Groups: {groups}")
+
+    visualize_groups_as_treemap(groups)
+
+    time_dict = {k: v[3] for k, v in filtered.items()}
+    levenshtein_dict = {k: v[4] for k, v in filtered.items()}
+    st.header("Time Z-Scores")
+    st.bar_chart(time_dict, use_container_width=True, color="#3d606e")
+    st.header("Levenshtein Z-Scores")
+    st.bar_chart(levenshtein_dict, use_container_width=True, color="#3d606e")
+    st.write(f"Overall correlation coefficient: {np.corrcoef(abs_time_dists, abs_lev_dists)[0][1]:.3f}")
+
+    st.write("Filtered relations:")
+    for k, v in filtered.items():
+        st.write(f"{k}: {v[3]:.2f}, {v[4]:.2f}, {v[2]:.2f}")
